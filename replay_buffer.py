@@ -7,6 +7,7 @@ class ReplayBuffer(object):
         self.capacity = capacity
         self.memory = []
         self.position = 0
+    
         
     def push(self, batch) -> None:
         """Add a new experience to memory."""
@@ -20,6 +21,7 @@ class ReplayBuffer(object):
         """Randomly sample a batch of experiences from memory."""
         
         return random.sample(self.memory, batch_size)
+    
     
     def __len__(self) -> int:
         """Return the current size of internal memory."""
