@@ -2,12 +2,13 @@ import torch
 import torch.optim as optim
 import random
 from model import QNetwork
+from replay_buffer import ReplayBuffer, Trajectory
 
 use_cude = torch.cuda.is_available()
 device = torch.device("cuda" if use_cude else "cpu")
 
 class Agent(object):
-    def __init__(self, n_states, n_actions, hidden_size, learning_rate=0.0001) -> None:
+    def __init__(self, n_states, n_actions, hidden_size, batch_size, learning_rate=0.0001) -> None:
         """Deep Q-Network (DQN) agent that interacts with the environment.
         
         Args:
@@ -24,6 +25,9 @@ class Agent(object):
         
         self.n_states = n_states
         self.n_actions = n_actions
+        
+        self.batch_size = batch_size
+        self.replay_buffer = ReplayBuffer(10000)
         
         
     def get_action(self, state, eps, explorate=True):
@@ -47,23 +51,31 @@ class Agent(object):
         
         return action
         
-    def learn(self, state, action, reward, next_state, done, gamma):
+    def learn(self, gamma):
         """Update value parameters using given batch of experience tuples.
         
         Args:
-            state (torch.Tensor): Current state.
-            action (torch.Tensor): Action taken in the state.
-            reward (torch.Tensor): Reward received after taking action.
-            next_state (torch.Tensor): Next state.
-            done (torch.Tensor): Whether the episode is complete or not.
             gamma (float): Discount factor.
         """
-
-        q_values = self.model(state).gather(1, action)
         
-        max_next_q_values = self.model(next_state).max(1)[0].view(-1, 1)
-        target_q_values = reward + (gamma * max_next_q_values * (1 - done))
-            
+        if self.replay_buffer.__len__() < self.batch_size:
+            return
+        
+        trajectories = self.replay_buffer.sample(self.batch_size)
+        
+        batch = Trajectory(*zip(*trajectories))
+        
+        states = torch.cat(batch.state)
+        actions = torch.cat(batch.action)
+        rewards = torch.cat(batch.reward).view(-1, 1)
+        next_states = torch.cat(batch.next_state)
+        dones = torch.cat(batch.done).view(-1, 1)
+
+        q_values = self.model(states).gather(1, actions)
+        
+        max_next_q_values = self.model(next_states).max(1)[0].view(-1, 1)
+        target_q_values = rewards + (gamma * max_next_q_values * (1 - dones))
+        
         loss = self.mse_loss(q_values, target_q_values)
         
         self.optimizer.zero_grad()

@@ -1,4 +1,7 @@
 import random
+from collections import namedtuple
+
+Trajectory = namedtuple('Trajectory', ['state', 'action', 'reward', 'next_state', 'done'])
 
 class ReplayBuffer(object):
     def __init__(self, capacity) -> None:
