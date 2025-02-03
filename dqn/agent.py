@@ -8,7 +8,7 @@ use_cude = torch.cuda.is_available()
 device = torch.device("cuda" if use_cude else "cpu")
 
 class Agent(object):
-    def __init__(self, n_states, n_actions, hidden_size, batch_size, learning_rate=0.0001) -> None:
+    def __init__(self, n_states, n_actions, hidden_size, batch_size, learning_rate=0.0001, gamma=0.99) -> None:
         """Deep Q-Network (DQN) agent that interacts with the environment.
         
         Args:
@@ -28,6 +28,8 @@ class Agent(object):
         
         self.batch_size = batch_size
         self.replay_buffer = ReplayBuffer(10000)
+        
+        self.gamma = gamma
         
         
     def get_action(self, state, eps, explorate=True):
@@ -51,11 +53,8 @@ class Agent(object):
         
         return action
         
-    def learn(self, gamma):
+    def learn(self):
         """Update value parameters using given batch of experience tuples.
-        
-        Args:
-            gamma (float): Discount factor.
         """
         
         if self.replay_buffer.__len__() < self.batch_size:
@@ -74,7 +73,7 @@ class Agent(object):
         q_values = self.model(states).gather(1, actions)
         
         max_next_q_values = self.model(next_states).max(1)[0].view(-1, 1)
-        target_q_values = rewards + (gamma * max_next_q_values * (1 - dones))
+        target_q_values = rewards + (self.gamma * max_next_q_values * (1 - dones))
         
         loss = self.mse_loss(q_values, target_q_values)
         
