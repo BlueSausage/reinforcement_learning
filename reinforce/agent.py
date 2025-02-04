@@ -34,7 +34,7 @@ class Agent(object):
             int: Chosen action.
         """
         
-        probs = self.policy(state.float()) # Action probabilities
+        probs = self.policy(state.float()).squeeze(0) # Action probabilities
         dist = Categorical(probs)
         action = dist.sample()
             
@@ -48,20 +48,16 @@ class Agent(object):
             log_probs (list): List of log probabilities.
         """
         
-        returns = []
+        returns = torch.zeros(len(rewards), device=device)
         G = 0
-        for r in rewards[::-1]:
-            G = r + self.gamma * G
-            returns.insert(0, G)
+        for t in reversed(range(len(rewards))):
+            G = rewards[t] + self.gamma * G
+            returns[t] = G
         
-        returns = torch.tensor(returns).to(device)
-        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
-        
-        policy_loss = []
-        for log_prob, G in zip(log_probs, returns):
-            policy_loss.append(-log_prob * G)
+        returns = (returns - returns.mean()) / (returns.std().clamp(min=1e-8))
+        log_probs = torch.stack(log_probs)
+        policy_loss = -1 * (returns * log_probs).sum()
         
         self.optimizer.zero_grad()
-        policy_loss = torch.stack(policy_loss).sum()
         policy_loss.backward()
         self.optimizer.step()
