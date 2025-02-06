@@ -42,6 +42,9 @@ class Agent(object):
         
         self.scores = []
         self.avg_scores = []
+        
+        self.returns_history = []
+        self.max_history = 100
     
 
     def get_action(self, state):
@@ -68,14 +71,26 @@ class Agent(object):
             rewards (list): List of rewards.
             log_probs (list): List of log probabilities.
         """
+        # Calculate Monte-Carlo returns
         self.policy.train()
         returns = torch.zeros(len(rewards), device=device)
         G = 0
         for t in reversed(range(len(rewards))):
             G = rewards[t] + self.gamma * G
             returns[t] = G
+            
+        # Calculate baseline (average returns of the last n episodes)
+        if self.returns_history:
+            baseline = sum(self.returns_history) / len(self.returns_history)
+        else:
+            baseline = 0
         
-        returns = (returns - returns.mean()) / (returns.std().clamp(min=1e-10))
+        # Save return of the current episode
+        self.returns_history.append(returns[0].item())
+        if len(self.returns_history) > self.max_history:
+            self.returns_history.pop(0)
+        
+        returns = (returns - baseline) / (returns.std().clamp(min=1e-10))
         log_probs = torch.stack(log_probs)
         policy_loss = -1 * (returns * log_probs).sum()
         
