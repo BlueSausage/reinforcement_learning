@@ -2,25 +2,46 @@ import torch
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import PolicyNetwork
+import time
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-use_cude = torch.cuda.is_available()
-device = torch.device("cuda" if use_cude else "cpu")
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
+
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class Agent(object):
-    def __init__(self, n_states, n_actions, hidden_size, learning_rate=0.0001, gamma=0.99) -> None:
+    def __init__(self, env, hidden_size, learning_rate=0.0001, gamma=0.99, print_every = 100) -> None:
         """Reinforce agent that interacts with the environment.
         
         Args:
-            n_states (int): Number of states.
-            n_actions (int): Number of actions.
+            env: The environment to interact with.
             hidden_size (list): List of hidden layer sizes.
             learning_rate (float): Learning rate.
             gamma (float): Discount factor.
+            print_every (int): Print every n episodes.
         """
-        self.gamma = gamma
+        plt.style.use("seaborn-v0_8-darkgrid")
+        self.env = env
         
-        self.policy = PolicyNetwork(n_states, n_actions, hidden_size).to(device)
+        self.n_states = env.observation_space.shape[0]
+        self.n_actions = env.action_space.n
+        self.threshold = env.spec.reward_threshold
+        
+        self.policy = PolicyNetwork(self.n_states, self.n_actions, hidden_size).to(device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        
+        self.gamma = gamma
+        self.print_every = print_every
+        
+        self.scores = []
+        self.avg_scores = []
     
 
     def get_action(self, state):
@@ -39,7 +60,8 @@ class Agent(object):
             
         return action.item(), dist.log_prob(action)
     
-    def learn(self, rewards, log_probs):
+    
+    def optimize(self, rewards, log_probs):
         """Update policy using given batch of rewards and log probabilities.
         
         Args:
@@ -60,3 +82,115 @@ class Agent(object):
         self.optimizer.zero_grad()
         policy_loss.backward()
         self.optimizer.step()
+        
+        
+    def run_episode(self):
+        """Run a single episode of the environment with the agent. Return the rewards and log probabilities of the actions taken.
+        
+        Returns:
+            rewards: A list of rewards received at each time step.
+            log_probs: A list of log probabilities of the actions taken at each time step.
+        """
+        state = self.env.reset()[0] # Reset environment and get initial state
+        done = False
+        log_probs = []
+        rewards = []
+        
+        while not done:
+            action, log_prob = self.get_action(FloatTensor([state]))
+            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            log_probs.append(log_prob)
+            rewards.append(reward)
+            
+            done = terminated or truncated
+            
+            if done:
+                break
+            
+            state = next_state
+            
+        return rewards, log_probs
+    
+    
+    def learn(self, num_episodes = 5000, ignore_threshold = False):
+        """Train the agent to interact with the environment.
+        
+        Args:
+            num_episodes (int): Number of episodes to train the agent.
+            
+        Returns:
+            scores: List of scores received at each episode.
+            avg_scores: List of average scores received at each episode.
+        """
+        cumulative_score = 0
+        time_start = time.time()
+        
+        for episode in range(num_episodes):
+            rewards, log_probs = self.run_episode()
+            self.optimize(rewards, log_probs)
+            
+            score = sum(rewards)
+            self.scores.append(score)
+            
+            if len(self.scores) == 1:
+                cumulative_score = score
+            else:
+                cumulative_score += score
+                if len(self.scores) > self.print_every:
+                    cumulative_score -= self.scores[-self.print_every - 1]
+                    
+            avg_score = cumulative_score / min(len(self.scores), self.print_every)
+            self.avg_scores.append(avg_score)
+            
+            if episode % self.print_every == 0 or episode == num_episodes - 1:
+                dt = int(time.time() - time_start)
+                time_start = time.time()
+                print(f"Episode {episode} - Score: {score} - Avg Score: {avg_score:.2f} - Time: {dt}s")
+                
+            if avg_score >= self.threshold and not ignore_threshold:
+                print(f"Environment solved in {episode} episodes with an average score of {avg_score:.2f}!")
+                break
+        
+        return self.scores, self.avg_scores
+    
+    
+    def plot_scores(self):
+        """Plot the scores and average scores of the training progress.
+        """
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.scatter(np.arange(1, len(self.scores) + 1), self.scores, label="Score", color="blue", alpha=0.5, s=1.5)
+        ax.plot(np.arange(1, len(self.avg_scores) + 1), self.avg_scores, label="Average Score", color="red", linewidth=2)
+        ax.axhline(self.threshold, color="green", linestyle="--", label="Threshold")
+        
+        ax.set_title("Training Progress", fontsize=16)
+        ax.set_xlabel("Episode #", fontsize=14)
+        ax.set_ylabel("Score", fontsize=14)
+        
+        ax.legend(loc="best", fontsize=12)
+        ax.grid(True, linestyle="--", alpha=0.6)
+        
+        ax2 = ax.twinx()
+        ax.set_ylim(ax.get_ylim())
+        
+        plt.tight_layout()
+        plt.show()
+        
+    
+    def save_model(self, file_name):
+        """Save the model.
+        
+        Args:
+            file_name (str): Name of the file to save the model.
+        """
+        path = os.path.join(os.getcwd(), "models", file_name)
+        torch.save(self.policy.state_dict(), path)
+        
+        
+    def load_model(self, file_name):
+        """Load the model.
+        
+        Args:
+            file_name (str): Name of the file to load the model.
+        """
+        path = os.path.join(os.getcwd(), "models", file_name)
+        self.policy.load_state_dict(torch.load(path, map_location=device))
