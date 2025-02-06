@@ -13,16 +13,15 @@ class Agent(object):
         Args:
             n_states (int): Number of states.
             n_actions (int): Number of actions.
-            hidden_size (int): Size of hidden layers.
+            hidden_size (list): List of hidden layer sizes.
             learning_rate (float): Learning rate.
             gamma (float): Discount factor.
         """
-
-        self.policy = PolicyNetwork(n_states, n_actions, hidden_size).to(device)
-        
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
-        
         self.gamma = gamma
+        
+        self.policy = PolicyNetwork(n_states, n_actions, hidden_size).to(device)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+    
 
     def get_action(self, state):
         """Returns actions for given state as per current policy.
@@ -33,7 +32,7 @@ class Agent(object):
         Returns:
             int: Chosen action.
         """
-        
+        self.policy.eval()
         probs = self.policy(state.float()).squeeze(0) # Action probabilities
         dist = Categorical(probs)
         action = dist.sample()
@@ -47,14 +46,14 @@ class Agent(object):
             rewards (list): List of rewards.
             log_probs (list): List of log probabilities.
         """
-        
+        self.policy.train()
         returns = torch.zeros(len(rewards), device=device)
         G = 0
         for t in reversed(range(len(rewards))):
             G = rewards[t] + self.gamma * G
             returns[t] = G
         
-        returns = (returns - returns.mean()) / (returns.std().clamp(min=1e-8))
+        returns = (returns - returns.mean()) / (returns.std().clamp(min=1e-10))
         log_probs = torch.stack(log_probs)
         policy_loss = -1 * (returns * log_probs).sum()
         
