@@ -10164,3 +10164,6 @@ venv/lib/python3.12/site-packages/swig-4.3.0.dist-info/licenses/LICENSE-GPL
 venv/lib/python3.12/site-packages/swig-4.3.0.dist-info/licenses/LICENSE-SWIG
 venv/lib/python3.12/site-packages/swig-4.3.0.dist-info/licenses/LICENSE-UNIVERSITIES
 .DS_Store
+*.pdf
+*.png
+*.pth
