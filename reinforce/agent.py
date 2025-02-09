@@ -17,7 +17,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class Agent(object):
-    def __init__(self, env, hidden_size, learning_rate=0.0001, gamma=0.99, print_every = 100) -> None:
+    def __init__(self, env, hidden_size, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
         """Reinforce agent that interacts with the environment.
         
         Args:
@@ -36,15 +36,16 @@ class Agent(object):
         
         self.policy = PolicyNetwork(self.n_states, self.n_actions, hidden_size).to(device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.scheduler = optim.lr_scheduler.LinearLR(
+            self.optimizer, start_factor=1.0, end_factor=0.2, total_iters=num_episodes
+        )
         
         self.gamma = gamma
         self.print_every = print_every
+        self.num_episodes = num_episodes
         
         self.scores = []
         self.avg_scores = []
-        
-        self.returns_history = []
-        self.max_history = 100
     
 
     def get_action(self, state):
@@ -64,41 +65,6 @@ class Agent(object):
         return action.item(), dist.log_prob(action)
     
     
-    def optimize(self, rewards, log_probs):
-        """Update policy using given batch of rewards and log probabilities.
-        
-        Args:
-            rewards (list): List of rewards.
-            log_probs (list): List of log probabilities.
-        """
-        # Calculate Monte-Carlo returns
-        self.policy.train()
-        returns = torch.zeros(len(rewards), device=device)
-        G = 0
-        for t in reversed(range(len(rewards))):
-            G = rewards[t] + self.gamma * G
-            returns[t] = G
-            
-        # Calculate baseline (average returns of the last n episodes)
-        if self.returns_history:
-            baseline = sum(self.returns_history) / len(self.returns_history)
-        else:
-            baseline = 0
-        
-        # Save return of the current episode
-        self.returns_history.append(returns[0].item())
-        if len(self.returns_history) > self.max_history:
-            self.returns_history.pop(0)
-        
-        returns = (returns - baseline) / (returns.std().clamp(min=1e-10))
-        log_probs = torch.stack(log_probs)
-        policy_loss = -1 * (returns * log_probs).sum()
-        
-        self.optimizer.zero_grad()
-        policy_loss.backward()
-        self.optimizer.step()
-        
-        
     def run_episode(self):
         """Run a single episode of the environment with the agent. Return the rewards and log probabilities of the actions taken.
         
@@ -112,7 +78,9 @@ class Agent(object):
         rewards = []
         
         while not done:
-            action, log_prob = self.get_action(FloatTensor([state]))
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            action, log_prob = self.get_action(state_tensor)
+            
             next_state, reward, terminated, truncated, _ = self.env.step(action)
             log_probs.append(log_prob)
             rewards.append(reward)
@@ -127,7 +95,35 @@ class Agent(object):
         return rewards, log_probs
     
     
-    def learn(self, num_episodes = 5000, ignore_threshold = False):
+    def optimize(self, rewards, log_probs):
+        """Update policy using given batch of rewards and log probabilities from one episode.
+        
+        Args:
+            rewards (list): List of rewards.
+            log_probs (list): List of log probabilities.
+        """
+        self.policy.train()
+        
+        # Calculate Monte-Carlo total returns
+        returns = torch.zeros(len(rewards), device=device)
+        G = 0
+        for t in reversed(range(len(rewards))):
+            G = rewards[t] + self.gamma * G
+            returns[t] = G
+
+        # Calculate baseline and policy loss
+        returns = (returns - returns.mean()) / (returns.std().clamp(min=1e-10))
+        log_probs = torch.stack(log_probs)
+        policy_loss = -1 * (returns * log_probs).sum()
+        
+        # Optimize the model
+        self.optimizer.zero_grad()
+        policy_loss.backward()
+        self.optimizer.step()
+        self.scheduler.step()
+    
+    
+    def learn(self, ignore_threshold=False):
         """Train the agent to interact with the environment.
         
         Args:
@@ -140,7 +136,7 @@ class Agent(object):
         cumulative_score = 0
         time_start = time.time()
         
-        for episode in range(num_episodes):
+        for episode in range(self.num_episodes):
             rewards, log_probs = self.run_episode()
             self.optimize(rewards, log_probs)
             
@@ -157,10 +153,10 @@ class Agent(object):
             avg_score = cumulative_score / min(len(self.scores), self.print_every)
             self.avg_scores.append(avg_score)
             
-            if episode % self.print_every == 0 or episode == num_episodes - 1:
+            if episode % self.print_every == 0 or episode == self.num_episodes - 1:
                 dt = int(time.time() - time_start)
                 time_start = time.time()
-                print(f"Episode {episode} - Score: {score} - Avg Score: {avg_score:.2f} - Time: {dt}s")
+                print(f"Episode {episode} - Score: {score} - Avg Score: {avg_score:.2f} - Learning Rate: {self.scheduler.get_last_lr()} - Time: {dt}s")
                 
             if avg_score >= self.threshold and not ignore_threshold:
                 print(f"Environment solved in {episode} episodes with an average score of {avg_score:.2f}!")
@@ -185,14 +181,14 @@ class Agent(object):
         ax.grid(True, linestyle="--", alpha=0.6)
         
         ax2 = ax.twinx()
-        ax.set_ylim(ax.get_ylim())
+        ax2.set_ylim(ax.get_ylim())
         
         plt.tight_layout()
         plt.show()
         
     
     def save_model(self, file_name):
-        """Save the model.
+        """Save the model with file extension .pth.
         
         Args:
             file_name (str): Name of the file to save the model.
@@ -202,7 +198,7 @@ class Agent(object):
         
         
     def load_model(self, file_name):
-        """Load the model.
+        """Load a model with file extension .pth.
         
         Args:
             file_name (str): Name of the file to load the model.
