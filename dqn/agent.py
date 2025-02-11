@@ -13,7 +13,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class DQNAgent():
-    def __init__(self, env, hidden_size, batch_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
+    def __init__(self, env, hidden_size, batch_size=64, replay_buffer_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
         """Deep Q-Network (DQN) agent that interacts with the environment.
         
         Args:
@@ -39,7 +39,7 @@ class DQNAgent():
         self.mse_loss = torch.nn.MSELoss()
         
         self.batch_size = batch_size
-        self.replay_buffer = ReplayBuffer(batch_size)
+        self.replay_buffer = ReplayBuffer(replay_buffer_size)
         
         self.gamma = gamma
         self.min_epsilon = min_epsilon
