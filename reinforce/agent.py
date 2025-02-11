@@ -16,7 +16,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
-class Agent(object):
+class REINFORCEAgent():
     def __init__(self, env, hidden_size, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
         """Reinforce agent that interacts with the environment.
         
