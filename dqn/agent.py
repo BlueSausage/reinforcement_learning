@@ -147,8 +147,6 @@ class DQNAgent():
                     if random.random() < 0.2:
                         action = torch.tensor([[self.no_engine]], device=device)
                 
-            
-            action = self.get_action(state_tensor, eps)
             next_state, reward, terminated, truncated, _ = self.env.step(action.item())
             total_reward += reward
             
