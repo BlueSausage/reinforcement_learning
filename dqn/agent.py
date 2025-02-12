@@ -132,19 +132,16 @@ class DQNAgent():
         
         while not done:
             state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            action = self.get_action(state_tensor, eps)
             
             if self.engine_failure == 'random_failure':
                 if random.random() < 0.2:
                     action = torch.tensor([[self.no_engine]], device=device)
-                else:
-                    action = self.get_action(state_tensor, eps)
             elif self.engine_failure == 'main_engine_failure':
-                action = self.get_action(state_tensor, eps)
                 if action.item() == self.main_engine:
                     if random.random() < 0.2:
                         action = torch.tensor([[self.no_engine]], device=device)
-            else:
-                action = self.get_action(state_tensor, eps)
+                
             
             action = self.get_action(state_tensor, eps)
             next_state, reward, terminated, truncated, _ = self.env.step(action.item())
