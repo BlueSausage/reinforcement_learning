@@ -11,15 +11,15 @@ This project will examine two sources of uncertainty in order to understand how 
 
 #### Random Engine Failure
 
-    Scenario 1: 80% probability of success of the selected action
+80% probability of success of the selected action
 
-    In this scenario, the action selected by the agent works in 80% of the time and in 20% of the cases the action is replaced by a “zero action” (i.e. no engine fires, even if the agent has selected an action). This scenario examines the robustness of the agent against systemic uncertainties.
+In this scenario, the action selected by the agent works in 80% of the time and in 20% of the cases the action is replaced by a “zero action” (i.e. no engine fires, even if the agent has selected an action). This scenario examines the robustness of the agent against systemic uncertainties.
 
 #### Central Engine Failure
 
-    Scenario 2: 80% probability of success for a specific engine (e.g. main engine)
+80% probability of success for a specific engine (e.g. main engine)
 
-    In this scenario, the middle engine is selected to malfunction 80% of the time, which results in action 0 being executed (no engine fires), whereas it operates as expected 20% of the time. This scenario examines how the agent can deal with the uncertainty of a specific engine failure, especially when the affected engine plays a central role in controlling the system.
+In this scenario, the middle engine is selected to malfunction 20% of the time, which results in action 0 being executed (no engine fires), whereas it operates as expected 80% of the time. This scenario examines how the agent can deal with the uncertainty of a specific engine failure, especially when the affected engine plays a central role in controlling the system.
 
 ### LunarLanding
 
