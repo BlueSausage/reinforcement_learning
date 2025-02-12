@@ -13,7 +13,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class DQNAgent():
-    def __init__(self, env, hidden_size, batch_size=64, replay_buffer_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
+    def __init__(self, env, hidden_size, engine_failure, batch_size=64, replay_buffer_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
         """Deep Q-Network (DQN) agent that interacts with the environment.
         
         Args:
@@ -27,7 +27,7 @@ class DQNAgent():
             num_episodes (int): Number of episodes to train the agent.
             print_every (int): Print every n episodes.
         """
-        plt.style.use("seaborn-v0_8-darkgrid")
+        plt.style.use("seaborn-v0_8-paper")
         self.env = env
         
         self.n_states = env.observation_space.shape[0]
@@ -38,6 +38,8 @@ class DQNAgent():
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.mse_loss = torch.nn.MSELoss()
         
+        self.engine_failure = engine_failure
+        
         self.batch_size = batch_size
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
         
@@ -47,6 +49,8 @@ class DQNAgent():
         self.max_num_episodes = num_episodes
         self.print_every = print_every
         
+        self.no_engine = 0
+        self.main_engine = 2
         self.scores = []
         self.avg_scores = []
 
@@ -117,7 +121,6 @@ class DQNAgent():
         """Run a single episode of the environment and train the agent.
         
         Args:
-            env (gym.Env): The environment to run.
             eps (float): The epsilon value to use for the episode.
             
         Returns:
@@ -129,6 +132,20 @@ class DQNAgent():
         
         while not done:
             state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            
+            if self.engine_failure == 'random_failure':
+                if random.random() < 0.2:
+                    action = torch.tensor([[self.no_engine]], device=device)
+                else:
+                    action = self.get_action(state_tensor, eps)
+            elif self.engine_failure == 'main_engine_failure':
+                action = self.get_action(state_tensor, eps)
+                if action.item() == self.main_engine:
+                    if random.random() < 0.2:
+                        action = torch.tensor([[self.no_engine]], device=device)
+            else:
+                action = self.get_action(state_tensor, eps)
+            
             action = self.get_action(state_tensor, eps)
             next_state, reward, terminated, truncated, _ = self.env.step(action.item())
             total_reward += reward
@@ -230,7 +247,7 @@ class DQNAgent():
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.scatter(np.arange(1, len(self.scores) + 1), self.scores, label="Score", color="blue", alpha=0.5, s=1.5)
         ax.plot(np.arange(1, len(self.avg_scores) + 1), self.avg_scores, label="Average Score", color="red", linewidth=2)
-        ax.axhline(self.threshold, color="green", linestyle="--", label="Threshold")
+        ax.axhline(self.threshold, color="green", label="Threshold")
         
         ax.set_title("Training Progress", fontsize=16)
         ax.set_xlabel("Episode #", fontsize=14)
