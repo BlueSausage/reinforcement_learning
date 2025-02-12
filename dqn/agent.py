@@ -1,12 +1,17 @@
 import torch
 import torch.optim as optim
 import random
-import numpy as np
-import matplotlib.pyplot as plt
 import time
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 import os
 from model import QNetwork
 from replay_buffer import ReplayBuffer, Trajectory
+
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
