@@ -1,12 +1,13 @@
 import torch
 import torch.optim as optim
-from torch.distributions import Categorical
-from model import PolicyNetwork
+import random
 import time
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from model import PolicyNetwork
+from torch.distributions import Categorical
 
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -17,7 +18,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class REINFORCEAgent():
-    def __init__(self, env, hidden_size, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
+    def __init__(self, env, hidden_size, engine_failure, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
         """Reinforce agent that interacts with the environment.
         
         Args:
@@ -27,7 +28,7 @@ class REINFORCEAgent():
             gamma (float): Discount factor.
             print_every (int): Print every n episodes.
         """
-        plt.style.use("seaborn-v0_8-darkgrid")
+        plt.style.use("seaborn-v0_8-paper")
         self.env = env
         
         self.n_states = env.observation_space.shape[0]
@@ -40,10 +41,14 @@ class REINFORCEAgent():
             self.optimizer, start_factor=1.0, end_factor=0.2, total_iters=num_episodes
         )
         
+        self.engine_failure = engine_failure
+        
         self.gamma = gamma
         self.print_every = print_every
         self.num_episodes = num_episodes
         
+        self.no_engine = 0
+        self.main_engine = 2
         self.scores = []
         self.avg_scores = []
     
@@ -62,7 +67,7 @@ class REINFORCEAgent():
         dist = Categorical(probs)
         action = dist.sample()
             
-        return action.item(), dist.log_prob(action)
+        return action, dist.log_prob(action)
     
     
     def run_episode(self):
@@ -81,7 +86,15 @@ class REINFORCEAgent():
             state_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
             action, log_prob = self.get_action(state_tensor)
             
-            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            if self.engine_failure == 'random_failure':
+                if random.random() < 0.2:
+                    action = torch.tensor([[self.no_engine]], device=device)
+            elif self.engine_failure == 'main_engine_failure':
+                if action.item() == self.main_engine:
+                    if random.random() < 0.2:
+                        action = torch.tensor([[self.no_engine]], device=device)
+            
+            next_state, reward, terminated, truncated, _ = self.env.step(action.item())
             log_probs.append(log_prob)
             rewards.append(reward)
             
@@ -171,7 +184,7 @@ class REINFORCEAgent():
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.scatter(np.arange(1, len(self.scores) + 1), self.scores, label="Score", color="blue", alpha=0.5, s=1.5)
         ax.plot(np.arange(1, len(self.avg_scores) + 1), self.avg_scores, label="Average Score", color="red", linewidth=2)
-        ax.axhline(self.threshold, color="green", linestyle="--", label="Threshold")
+        ax.axhline(self.threshold, color="green", label="Threshold")
         
         ax.set_title("Training Progress", fontsize=16)
         ax.set_xlabel("Episode #", fontsize=14)
