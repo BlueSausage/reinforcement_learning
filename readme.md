@@ -42,11 +42,11 @@ In this scenario, the middle engine is selected to malfunction 20% of the time, 
 
 2. REINFORCE works well with discrete actions
 
-    Even though REINFORCE is a policy gradient algorithm that can also be used in continuous environments, it will typically be easier to implement and test in discrete environments, especially if you use the classical variants of REINFORCE without further modifications.
+    Even though REINFORCE is a policy gradient algorithm that can also be used in continuous environments, it can also be used in discrete environments (Sutton et al., 1999).
 
 3. Implementation and comparison are simpler
 
-    The discrete version of the LunarLander environment provides a clearly defined set of possible actions (e.g. turning different thrusters on or off), which simplifies the implementation and comparison of the two algorithms. In a continuous environment, you would work with continuous action settings, which could make the comparison and analysis of the two algorithms more complex. The discrete actionspace reduces complexity and focuses on the essential aspects of agent robustness in relation to system disruptions.
+    The discrete version of the LunarLander environment provides a clearly defined set of possible actions (e.g. turning different thrusters on or off), which simplifies the implementation and comparison of the two algorithms. A continuous environment could make the comparison and analysis of the two algorithms more complex. The discrete actionspace reduces complexity and focuses on the essential aspects of agent robustness in relation to system disruptions.
 
 #### Observation Space
 8-dimensional vector
