@@ -58,6 +58,18 @@ class DQNAgent():
         self.main_engine = 2
         self.scores = []
         self.avg_scores = []
+        
+        
+    def epsilon_decay(self, episode: int) -> float:
+        """Exponential decay for 𝜖 with a fixed decay factor.
+    
+        Args:
+            episode (int): The current episode number.
+            
+        Returns:
+            float: The 𝜖 value for the current episode.
+        """
+        return max(self.min_epsilon, 1.0 * 0.996**episode)
 
     
     def exponential_epsilon_decay(self, episode: int) -> float:
