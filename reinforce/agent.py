@@ -18,7 +18,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class REINFORCEAgent():
-    def __init__(self, env, hidden_size, engine_failure, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
+    def __init__(self, env, hidden_size, engine_failure=None, learning_rate=0.0001, gamma=0.99, print_every = 100, num_episodes=5000) -> None:
         """Reinforce agent that interacts with the environment.
         
         Args:
@@ -174,7 +174,8 @@ class REINFORCEAgent():
             if avg_score >= self.threshold and not ignore_threshold:
                 print(f"Environment solved in {episode} episodes with an average score of {avg_score:.2f}!")
                 break
-        
+
+        self.env.close()        
         return self.scores, self.avg_scores
     
     
