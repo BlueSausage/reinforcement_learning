@@ -18,7 +18,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 class DQNAgent():
-    def __init__(self, env, hidden_size, engine_failure=None, batch_size=64, replay_buffer_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
+    def __init__(self, env, hidden_size, explorate=True, engine_failure=None, batch_size=64, replay_buffer_size=10000, learning_rate=0.0001, gamma=0.99, min_epsilon=0.01, max_eps_episode=150, num_episodes=1000, print_every=100) -> None:
         """Deep Q-Network (DQN) agent that interacts with the environment.
         
         Args:
@@ -43,6 +43,7 @@ class DQNAgent():
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.mse_loss = torch.nn.MSELoss()
         
+        self.explorate = explorate
         self.engine_failure = engine_failure
         
         self.batch_size = batch_size
@@ -110,31 +111,9 @@ class DQNAgent():
         plt.xlabel("Episode #")
         plt.ylabel("Epsilon")
         plt.show()
-        
-        
-    def get_action(self, state, eps, explorate=True):
-        """Returns actions for given state as per current policy.
-        
-        Args:
-            state: Current state 2D-tensor of shape (n, input_size).
-            eps (float): Epsilon, for epsilon-greedy action selection (exploration).
-            check_eps (bool): If False, no epsilon check is performed.
-            
-        Returns:
-            int: Chosen action.
-        """
-        sample = random.random()
-        
-        if not explorate or sample > eps:
-            with torch.no_grad():
-                action = self.model(state.float()).argmax(dim=1).view(1, 1)
-        else:
-            action = torch.tensor([[random.randrange(self.n_actions)]], device=device)
-        
-        return action
     
     
-    def run_episode(self, eps):
+    def run_episode(self, eps=0.0):
         """Run a single episode of the environment and train the agent.
         
         Args:
@@ -181,6 +160,27 @@ class DQNAgent():
             
         return total_reward
         
+        
+    def get_action(self, state, eps):
+        """Returns actions for given state as per current policy.
+        
+        Args:
+            state: Current state 2D-tensor of shape (n, input_size).
+            eps (float): Epsilon, for epsilon-greedy action selection (exploration).
+            
+        Returns:
+            int: Chosen action.
+        """
+        sample = random.random()
+        
+        if not self.explorate or sample > eps:
+            with torch.no_grad():
+                action = self.model(state.float()).argmax(dim=1).view(1, 1)
+        else:
+            action = torch.tensor([[random.randrange(self.n_actions)]], device=device)
+        
+        return action
+
         
     def optimize(self):
         """Update value parameters using given batch of experience tuples.
@@ -276,7 +276,7 @@ class DQNAgent():
         plt.show()
         
         
-    def save(self, file_name):
+    def save_model(self, file_name):
         """Save the model with file extension .pth.
         
         Args:
